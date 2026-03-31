@@ -1,6 +1,6 @@
-# WordTurn：本地 Word 文档规则替换工具
+# Word Turn：本地 Word 文档规则替换工具
 
-这是一个**本地运行、开源、可二次开发**的 `.docx` 文档文字替换工具。
+这是一个**本地运行、开源、可二次开发**的 `.docx` 文档文字替换工具，项目名称统一为 **Word Turn**。
 
 你可以上传 Word 文档，然后按内置格式填写替换规则，程序会自动识别并修改文档内容，最后直接下载修改后的文件。
 
@@ -11,6 +11,9 @@
 - ✅ 支持规则化替换（普通文本 / 正则）
 - ✅ 支持正文和表格中的文字替换
 - ✅ 开源，便于用户自行修改与扩展
+- ✅ 新增 Windows 启动器（`word_turn_launcher.py` + `start_word_turn.bat`）
+- ✅ 内置自检与自动修复流程（依赖、目录、读写环境）
+- ✅ 采用加权健康指数（数学方法）展示系统状态
 
 ## 替换规则格式（内置规范）
 
@@ -49,20 +52,49 @@ regex:(\d{4})/(\d{2})/(\d{2})=>$1-$2-$3
 pip install -r requirements.txt
 ```
 
-### 2) 启动程序
+### 2) 启动程序（跨平台）
 
 ```bash
 streamlit run app.py
 ```
 
-启动后浏览器会自动打开本地地址（通常为 `http://localhost:8501`）。
+### 3) 启动程序（Windows 推荐）
+
+双击 `start_word_turn.bat`，或在命令行执行：
+
+```bat
+start_word_turn.bat
+```
+
+该启动器会打开 `Word Turn` 桌面启动面板，提供：
+
+- 运行自检
+- 一键修复
+- 启动 Web 主程序
+
+## 启动器自检项
+
+- Python 版本（要求 3.10+）
+- 依赖包（`streamlit`, `python-docx`）
+- 临时目录读写能力
+- 核心项目文件完整性
+- `output` 输出目录存在性
+
+系统健康指数使用加权求和方式：
+
+- 总分 100
+- 各项通过后按权重累加
+- 用于快速判断运行环境稳定性
 
 ## 项目结构
 
 ```text
 .
-├── app.py              # Streamlit 页面
-├── word_replacer.py    # 核心替换逻辑与规则解析
+├── app.py                   # Streamlit 页面
+├── word_replacer.py         # 核心替换逻辑与规则解析
+├── word_turn_launcher.py    # Windows 启动器（自检 + 修复 + 启动）
+├── start_word_turn.bat      # Windows 一键启动脚本
+├── tests/test_replacer.py
 ├── requirements.txt
 ├── LICENSE
 └── README.md
