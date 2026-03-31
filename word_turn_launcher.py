@@ -48,8 +48,18 @@ def _check_python_version() -> CheckResult:
 def _repair_package(package: str, install_dir: Path) -> tuple[bool, str]:
     site_packages_dir = install_dir / "site-packages"
     site_packages_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [sys.executable, "-m", "pip", "install", "--target", str(site_packages_dir), package]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--no-input",
+        "--target",
+        str(site_packages_dir),
+        package,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
     if proc.returncode == 0:
         return True, f"已安装 {package} 到 {site_packages_dir}"
     return False, (proc.stderr or proc.stdout or "安装失败").strip()
@@ -190,16 +200,22 @@ class LauncherApp:
         ttk.Label(wrapper, textvariable=self.install_dir_var, style="Sub.TLabel").pack(anchor="w", pady=(8, 0))
 
     def _append_status(self, text: str) -> None:
-        self.status_text.configure(state="normal")
-        self.status_text.insert("end", text + "\n")
-        self.status_text.see("end")
-        self.status_text.configure(state="disabled")
+        def _update() -> None:
+            self.status_text.configure(state="normal")
+            self.status_text.insert("end", text + "\n")
+            self.status_text.see("end")
+            self.status_text.configure(state="disabled")
+
+        self.root.after(0, _update)
 
     def _set_status_lines(self, lines: list[str]) -> None:
-        self.status_text.configure(state="normal")
-        self.status_text.delete("1.0", "end")
-        self.status_text.insert("1.0", "\n".join(lines) + "\n")
-        self.status_text.configure(state="disabled")
+        def _update() -> None:
+            self.status_text.configure(state="normal")
+            self.status_text.delete("1.0", "end")
+            self.status_text.insert("1.0", "\n".join(lines) + "\n")
+            self.status_text.configure(state="disabled")
+
+        self.root.after(0, _update)
 
     def _initial_check(self) -> None:
         self.run_checks()
@@ -211,7 +227,7 @@ class LauncherApp:
             icon = "✅" if item.ok else "❌"
             lines.append(f"{icon} {item.item}: {item.detail}")
         self._set_status_lines(lines)
-        self.score_var.set(f"健康指数: {score:.0f}/100")
+        self.root.after(0, lambda: self.score_var.set(f"健康指数: {score:.0f}/100"))
 
     def choose_install_dir(self) -> None:
         selected = filedialog.askdirectory(title="请选择安装目录", initialdir=str(self.install_dir))
@@ -256,13 +272,21 @@ class LauncherApp:
             self._append_status("⚠️ 已取消修复。")
             return
 
-        self._append_status("开始自动修复...")
-        for item in selected_repairs:
-            ok, detail = item.repair() if item.repair else (False, "无修复方法")
-            icon = "✅" if ok else "❌"
-            self._append_status(f"{icon} 修复 {item.item}: {detail}")
+        def _run_repairs() -> None:
+            self._append_status("开始自动修复...")
+            for item in selected_repairs:
+                try:
+                    ok, detail = item.repair() if item.repair else (False, "无修复方法")
+                except subprocess.TimeoutExpired:
+                    ok, detail = False, "安装超时（240 秒），请检查网络后重试。"
+                except Exception as exc:
+                    ok, detail = False, f"修复异常: {exc}"
+                icon = "✅" if ok else "❌"
+                self._append_status(f"{icon} 修复 {item.item}: {detail}")
 
-        self.run_checks()
+            self.run_checks()
+
+        threading.Thread(target=_run_repairs, daemon=True).start()
 
     def launch_app(self) -> None:
         def _run() -> None:
